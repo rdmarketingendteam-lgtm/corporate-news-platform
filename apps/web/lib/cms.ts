@@ -3,8 +3,10 @@ import 'server-only'
 import type { LexicalNode, LexicalState } from './lexical/types'
 
 /** Server-side only: the CMS base URL is never exposed to the browser. */
-export const CMS_URL = process.env.CMS_URL || 'http://localhost:3001'
+export const CMS_URL = process.env.CMS_URL
 export const SCRAPER_API_URL = process.env.SCRAPER_API_URL || 'http://127.0.0.1:8000'
+/** Only attempt CMS calls if an external CMS URL is explicitly configured (not local 3001 default) */
+export const HAS_CMS = Boolean(CMS_URL && CMS_URL !== 'http://localhost:3001' && CMS_URL.startsWith('http') && !CMS_URL.includes('localhost') && !CMS_URL.includes('192.168.'))
 
 /** Cache tags — keep in sync with apps/cms/src/lib/revalidate.ts */
 export const tags = {
@@ -463,26 +465,28 @@ export async function getLatestArticles(opts: {
     }, emptyPage<ArticleCard>())
   }
 
-  // First attempt CMS
-  try {
-    const extra: Record<string, string> = {}
-    if (opts.categoryId !== undefined) extra['where[category][equals]'] = String(opts.categoryId)
-    if (opts.tagId !== undefined) extra['where[tags][in]'] = String(opts.tagId)
-    if (opts.authorId !== undefined) extra['where[author][equals]'] = String(opts.authorId)
-    const cmsRes = await cms<Paginated<ArticleCard>>(
-      '/api/articles',
-      {
-        ...liveWhere(extra),
-        sort: '-publishedAt',
-        limit: Math.min(opts.limit ?? PAGE_SIZE, 50),
-        page: Math.min(Math.max(opts.page ?? 1, 1), 500),
-        depth: 1,
-        ...selectParams(CARD_SELECT),
-      },
-      { tags: [tags.articles, ...(opts.cacheTags ?? [])], revalidate: 120 },
-    )
-    if (cmsRes.docs && cmsRes.docs.length > 0) return cmsRes
-  } catch {}
+  // First attempt CMS only if an active CMS service is configured
+  if (HAS_CMS) {
+    try {
+      const extra: Record<string, string> = {}
+      if (opts.categoryId !== undefined) extra['where[category][equals]'] = String(opts.categoryId)
+      if (opts.tagId !== undefined) extra['where[tags][in]'] = String(opts.tagId)
+      if (opts.authorId !== undefined) extra['where[author][equals]'] = String(opts.authorId)
+      const cmsRes = await cms<Paginated<ArticleCard>>(
+        '/api/articles',
+        {
+          ...liveWhere(extra),
+          sort: '-publishedAt',
+          limit: Math.min(opts.limit ?? PAGE_SIZE, 50),
+          page: Math.min(Math.max(opts.page ?? 1, 1), 500),
+          depth: 1,
+          ...selectParams(CARD_SELECT),
+        },
+        { tags: [tags.articles, ...(opts.cacheTags ?? [])], revalidate: 120 },
+      )
+      if (cmsRes.docs && cmsRes.docs.length > 0) return cmsRes
+    } catch {}
+  }
 
   // Fallback to Scraper API
   return safe(async () => {
@@ -512,15 +516,17 @@ export async function getLatestArticles(opts: {
 
 /** Public (cached) article. Subscriber-only stories come back with `preview` and no `body`. */
 export async function getArticle(slug: string): Promise<Article | null> {
-  // First attempt CMS
-  try {
-    const res = await cms<Paginated<Article>>(
-      '/api/articles',
-      { ...liveWhere({ 'where[slug][equals]': slug }), limit: 1, depth: 2 },
-      { tags: [tags.article(slug), tags.articles], revalidate: 600 },
-    )
-    if (res.docs && res.docs[0]) return res.docs[0]
-  } catch {}
+  // First attempt CMS only if an active CMS service is configured
+  if (HAS_CMS) {
+    try {
+      const res = await cms<Paginated<Article>>(
+        '/api/articles',
+        { ...liveWhere({ 'where[slug][equals]': slug }), limit: 1, depth: 2 },
+        { tags: [tags.article(slug), tags.articles], revalidate: 600 },
+      )
+      if (res.docs && res.docs[0]) return res.docs[0]
+    } catch {}
+  }
 
   // Fallback to Scraper API
   return safe(async () => {
@@ -564,10 +570,12 @@ export async function getRedirect(path: string): Promise<string | null> {
 export function getCategories(): Promise<Category[]> {
   return safe<Category[]>(
     async () => {
-      try {
-        const res = await cms<Paginated<Category>>('/api/categories', { sort: 'order', limit: 50, depth: 0 }, { tags: [tags.taxonomy], revalidate: 3600 })
-        if (res.docs && res.docs.length > 0) return res.docs
-      } catch {}
+      if (HAS_CMS) {
+        try {
+          const res = await cms<Paginated<Category>>('/api/categories', { sort: 'order', limit: 50, depth: 0 }, { tags: [tags.taxonomy], revalidate: 3600 })
+          if (res.docs && res.docs.length > 0) return res.docs
+        } catch {}
+      }
 
       // Fallback from Scraper API
       try {
