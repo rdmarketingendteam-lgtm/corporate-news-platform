@@ -76,23 +76,15 @@ export default function AdminPortalPage() {
   async function loadData() {
     setLoading(true)
     try {
-      // 1. Fetch pending approvals
-      let token = localStorage.getItem('admin_token')
-      if (!token || token.startsWith('demo')) {
-        const loginRes = await fetch('/api/admin/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: 'superadmin', password: 'superadmin123' })
-        }).catch(() => null)
-        if (loginRes?.ok) {
-          const lData = await loginRes.json()
-          token = lData.token
-          if (token) localStorage.setItem('admin_token', token)
-        }
+      // 1. Fetch pending approvals using authenticated token from database login
+      const token = localStorage.getItem('admin_token')
+      if (!token) {
+        window.location.href = '/admin/login?redirect=' + encodeURIComponent('/admin')
+        return
       }
 
       const res = await fetch('/api/admin/pending', {
-        headers: { Authorization: `Bearer ${token || 'Bearer dev-token'}` }
+        headers: { Authorization: `Bearer ${token}` }
       }).catch(() => null)
 
       if (res?.ok) {

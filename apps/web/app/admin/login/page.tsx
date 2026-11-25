@@ -74,17 +74,6 @@ export default function AdminLoginPage() {
     }
   }
 
-  const fillCredentials = (user: 'superadmin' | 'admin') => {
-    if (user === 'superadmin') {
-      setIdentifier('superadmin')
-      setPassword('superadmin123')
-    } else {
-      setIdentifier('admin')
-      setPassword('admin123')
-    }
-    setError(null)
-  }
-
   const handleDirectDashboard = (target: string) => {
     window.location.href = target
   }
@@ -223,59 +212,6 @@ export default function AdminLoginPage() {
             </a>
           </div>
         )}
-
-        {/* Quick Demo Pre-fill Pills */}
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-            1-Click Demo Login
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => fillCredentials('superadmin')}
-              style={{
-                padding: '9px 12px',
-                background: '#1e293b',
-                border: '1px solid #334155',
-                borderRadius: '6px',
-                color: '#f59e0b',
-                fontSize: '11px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <i className="fa-solid fa-crown" style={{ fontSize: '10px' }}></i>
-              <span>Super Admin</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => fillCredentials('admin')}
-              style={{
-                padding: '9px 12px',
-                background: '#1e293b',
-                border: '1px solid #334155',
-                borderRadius: '6px',
-                color: '#38bdf8',
-                fontSize: '11px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <i className="fa-solid fa-user-shield" style={{ fontSize: '10px' }}></i>
-              <span>Editorial Admin</span>
-            </button>
-          </div>
-        </div>
 
         {/* Destination Choice */}
         <div style={{ marginBottom: '20px' }}>
