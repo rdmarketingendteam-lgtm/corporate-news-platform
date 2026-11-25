@@ -8,7 +8,7 @@
     "dev:all": "node start-dev.js",
     "scraper": "apps\\scraper\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --app-dir apps/scraper --host 0.0.0.0 --port 8000",
     "scraper:worker": "apps\\scraper\\.venv\\Scripts\\python.exe apps/scraper/continuous_worker.py",
-    "build": "pnpm --filter web build",
+    "build": "pnpm --filter web build && node scripts/copy-next.js",
     "build:cms": "pnpm --filter cms build",
     "build:all": "pnpm --filter cms build && pnpm --filter web build",
     "typecheck": "pnpm -r typecheck",
