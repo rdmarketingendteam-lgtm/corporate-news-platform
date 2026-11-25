@@ -1,18 +1,17 @@
 import { getCategoryDistribution, getLatestArticles, getArticlesSummary, getCategories, ArticleCard } from '../lib/cms'
 import { site } from '../lib/site'
-import { getCurrentUser } from '../lib/session'
+import { HeaderAuthLinks } from './HeaderAuthLinks'
 import { HeaderSearch } from './HeaderSearch'
 import { NewsletterForm } from './NewsletterForm'
 import { TrendingTicker } from './TrendingTicker'
 import { AspiriAdBanner } from './AspiriAdBanner'
 
 export async function SiteHeader() {
-  const [distributionRes, latestArticles, summary, allCategories, currentUser] = await Promise.all([
+  const [distributionRes, latestArticles, summary, allCategories] = await Promise.all([
     getCategoryDistribution({ limitPerCategory: 4 }),
     getLatestArticles({ limit: 8 }),
     getArticlesSummary(),
     getCategories(),
-    getCurrentUser(),
   ])
 
   const breakingStories = latestArticles.docs.slice(0, 5)
@@ -77,21 +76,7 @@ export async function SiteHeader() {
                 <i className="fa-solid fa-bolt mr-1" style={{ marginRight: '4px' }}></i> Subscribe
               </a>
               <span style={{ color: '#ccc' }}>|</span>
-              {currentUser ? (
-                <>
-                  <a href="/account" style={{ color: '#0284c7', fontWeight: 700 }} title="My Contributor Dashboard">
-                    <i className="fa-regular fa-circle-user mr-1" style={{ marginRight: '4px' }}></i> {currentUser.displayName || currentUser.email.split('@')[0]}
-                  </a>
-                  <span style={{ color: '#ccc' }}>|</span>
-                  <a href="/api/auth/logout" style={{ color: '#64748b' }} title="Log Out">
-                    <i className="fa-solid fa-arrow-right-from-bracket mr-1" style={{ marginRight: '4px' }}></i> Logout
-                  </a>
-                </>
-              ) : (
-                <a href="/login" style={{ color: '#444' }}>
-                  <i className="fa-regular fa-user mr-1" style={{ marginRight: '4px' }}></i> Sign in / Join
-                </a>
-              )}
+              <HeaderAuthLinks />
             </div>
 
             <div className="td-top-socials d-none d-lg-inline-flex">

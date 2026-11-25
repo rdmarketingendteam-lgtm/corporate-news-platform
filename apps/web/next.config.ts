@@ -21,8 +21,15 @@ const csp = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  compress: true,
   allowedDevOrigins: ['192.168.102.43'],
   reactStrictMode: true,
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    remotePatterns: [
+      { protocol: 'https', hostname: '**' },
+    ],
+  },
   experimental: {
     agentUpgrade: 'security',
   },
