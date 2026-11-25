@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>News Scraper Admin Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .status-badge-needs_review { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .status-badge-draft { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+    .status-badge-approved { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .status-badge-published { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .status-badge-archived { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- VIEW 1: LOGIN SCREEN -->
+  <div id="login-view" class="min-h-screen flex items-center justify-center bg-slate-900 p-4">
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 space-y-6">
+      <div class="text-center space-y-2">
+        <div class="w-14 h-14 bg-blue-600 rounded-xl mx-auto flex items-center justify-center text-white text-2xl shadow-lg">
+          <i class="fa-solid fa-newspaper"></i>
+        </div>
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">Newsroom Admin</h2>
+        <p class="text-xs text-slate-500">Sign in to manage news scraping, review articles & monitor feeds</p>
+      </div>
+
+      <div id="login-error" class="hidden p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center space-x-2">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        <span id="login-error-text">Invalid username or password</span>
+      </div>
+
+      <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Username</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-solid fa-user"></i></span>
+            <input type="text" id="login-username" required class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500" placeholder="e.g. admin">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Password</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-solid fa-lock"></i></span>
+            <input type="password" id="login-password" required class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500" placeholder="••••••••">
+          </div>
+        </div>
+
+        <button type="submit" id="login-btn" class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm shadow transition duration-200 flex items-center justify-center space-x-2">
+          <span>Sign In</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- VIEW 2: AUTHENTICATED APP -->
+  <div id="app-view" class="hidden flex-1 flex flex-col">
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-md">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xl font-bold shadow">
+            <i class="fa-solid fa-newspaper"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold tracking-tight">News Scraper Admin</h1>
+            <p class="text-xs text-slate-400">TOI · Indian Express · NDTV · News18</p>
+          </div>
+        </div>
+
+        <nav class="hidden md:flex space-x-1" id="nav-tabs">
+          <button onclick="switchTab('dashboard')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium transition text-white bg-slate-800" data-tab="dashboard">
+            <i class="fa-solid fa-chart-line mr-1.5"></i> Dashboard
+          </button>
+          <button onclick="switchTab('runs')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium transition text-slate-300 hover:text-white hover:bg-slate-800" data-tab="runs">
+            <i class="fa-solid fa-bolt mr-1.5"></i> Scrape Runs
+          </button>
+          <button onclick="switchTab('articles')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium transition text-slate-300 hover:text-white hover:bg-slate-800" data-tab="articles">
+            <i class="fa-solid fa-file-lines mr-1.5"></i> Articles
+          </button>
+          <button onclick="switchTab('categories')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium transition text-slate-300 hover:text-white hover:bg-slate-800" data-tab="categories">
+            <i class="fa-solid fa-tags mr-1.5"></i> Categories
+          </button>
+          <button onclick="switchTab('sources')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium transition text-slate-300 hover:text-white hover:bg-slate-800" data-tab="sources">
+            <i class="fa-solid fa-sliders mr-1.5"></i> Sources
+          </button>
+          <button onclick="switchTab('errors')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium transition text-slate-300 hover:text-white hover:bg-slate-800" data-tab="errors">
+            <i class="fa-solid fa-triangle-exclamation mr-1.5"></i> Errors & Logs
+          </button>
+          <button onclick="switchTab('audit')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium transition text-slate-300 hover:text-white hover:bg-slate-800" data-tab="audit">
+            <i class="fa-solid fa-clock-rotate-left mr-1.5"></i> Audit Logs
+          </button>
+        </nav>
+
+        <div class="flex items-center space-x-2">
+          <a href="http://192.168.102.43:3002/admin-panel" class="hidden lg:inline-flex items-center px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-semibold border border-slate-700">
+            <i class="fa-solid fa-chart-line mr-1"></i> Admin Panel
+          </a>
+          <a href="http://192.168.102.43:3002/admin" class="hidden lg:inline-flex items-center px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-semibold border border-slate-700">
+            <i class="fa-solid fa-network-wired mr-1"></i> Admin Portal
+          </a>
+          <button id="top-trigger-btn" onclick="triggerScrapeModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-md flex items-center shadow transition">
+            <i class="fa-solid fa-play mr-1.5"></i> Trigger Scrape
+          </button>
+          
+          <div class="flex items-center space-x-2 pl-2 border-l border-slate-700 text-xs">
+            <div class="text-right">
+              <div id="user-display-name" class="font-bold text-slate-200">admin</div>
+              <span id="user-role-badge" class="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-300 font-mono">admin</span>
+            </div>
+            <button onclick="handleLogout()" title="Sign Out" class="text-slate-400 hover:text-rose-400 p-1.5 rounded bg-slate-800 border border-slate-700 transition">
+              <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Mobile Navigation -->
+    <div class="md:hidden bg-slate-800 text-slate-200 px-4 py-2 flex space-x-2 overflow-x-auto text-xs">
+      <button onclick="switchTab('dashboard')" class="px-2 py-1 rounded bg-slate-700">Dashboard</button>
+      <button onclick="switchTab('runs')" class="px-2 py-1 rounded">Runs</button>
+      <button onclick="switchTab('articles')" class="px-2 py-1 rounded">Articles</button>
+      <button onclick="switchTab('categories')" class="px-2 py-1 rounded">Categories</button>
+      <button onclick="switchTab('sources')" class="px-2 py-1 rounded">Sources</button>
+      <button onclick="switchTab('errors')" class="px-2 py-1 rounded">Errors</button>
+      <button onclick="switchTab('audit')" class="px-2 py-1 rounded">Audit</button>
+    </div>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+
+      <!-- TAB 1: DASHBOARD -->
+      <div id="tab-dashboard" class="tab-content active space-y-6">
+        <!-- Filter Bar -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center space-x-2">
+            <span class="text-sm font-semibold text-slate-700"><i class="fa-solid fa-filter mr-1 text-blue-500"></i> Date Range:</span>
+            <select id="dash-range" onchange="loadDashboard()" class="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 focus:ring-2 focus:ring-blue-500">
+              <option value="today">Today</option>
+              <option value="24h" selected>Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="all">All Time</option>
+            </select>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <span class="text-sm font-semibold text-slate-700">Source:</span>
+            <select id="dash-source" onchange="loadDashboard()" class="text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 focus:ring-2 focus:ring-blue-500">
+              <option value="">All Sources</option>
+              <option value="toi">Times of India</option>
+              <option value="indian_express">The Indian Express</option>
+              <option value="ndtv">NDTV</option>
+              <option value="news18">News18</option>
+            </select>
+          </div>
+
+          <button onclick="loadDashboard()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300 transition">
+            <i class="fa-solid fa-rotate-right mr-1"></i> Refresh
+          </button>
+        </div>
+
+        <!-- Metric Cards Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
+              <span>Total Scrape Runs</span>
+              <i class="fa-solid fa-bolt text-blue-500 text-base"></i>
+            </div>
+            <div id="metric-total-runs" class="text-2xl font-bold text-slate-900 mt-2">--</div>
+            <div id="metric-runs-status" class="text-xs text-slate-500 mt-1">Status overview</div>
+          </div>
+
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
+              <span>Pages Checked</span>
+              <i class="fa-solid fa-file text-indigo-500 text-base"></i>
+            </div>
+            <div id="metric-pages-attempted" class="text-2xl font-bold text-slate-900 mt-2">--</div>
+            <div id="metric-page-success-rate" class="text-xs text-emerald-600 font-medium mt-1">Success: --%</div>
+          </div>
+
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
+              <span>Articles Discovered</span>
+              <i class="fa-solid fa-magnifying-glass text-amber-500 text-base"></i>
+            </div>
+            <div id="metric-articles-discovered" class="text-2xl font-bold text-slate-900 mt-2">--</div>
+            <div id="metric-new-vs-dup" class="text-xs text-slate-500 mt-1">New: -- · Dup: --</div>
+          </div>
+
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
+              <span>Saved in Database</span>
+              <i class="fa-solid fa-database text-emerald-500 text-base"></i>
+            </div>
+            <div id="metric-total-articles" class="text-2xl font-bold text-slate-900 mt-2">--</div>
+            <div class="text-xs text-slate-500 mt-1">Permanent articles</div>
+          </div>
+        </div>
+
+        <!-- Coverage Metrics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm font-semibold text-slate-800"><i class="fa-solid fa-image mr-1.5 text-blue-500"></i> Articles With Usable Image</span>
+              <span id="metric-image-coverage-pct" class="text-sm font-bold text-blue-600">--%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+              <div id="metric-image-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div id="metric-image-counts" class="text-xs text-slate-500 mt-2">-- with images out of -- saved articles</div>
+          </div>
+
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm font-semibold text-slate-800"><i class="fa-solid fa-align-left mr-1.5 text-emerald-500"></i> Articles With Description</span>
+              <span id="metric-desc-coverage-pct" class="text-sm font-bold text-emerald-600">--%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+              <div id="metric-desc-bar" class="bg-emerald-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div id="metric-desc-counts" class="text-xs text-slate-500 mt-2">-- with description out of -- saved articles</div>
+          </div>
+
+          <!-- Plagiarism & Paraphrase Shield Card -->
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-1 md:col-span-2">
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved text-purple-600 text-lg"></i>
+                <span class="text-sm font-bold text-slate-800">Content Paraphrasing & Anti-Plagiarism Shield</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="metric-plagiarism-status" class="px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-800 rounded-full">
+                  🟢 Plagiarism-Free (Safe)
+                </span>
+                <button onclick="triggerBatchParaphrase()" id="btn-batch-paraphrase" class="px-3 py-1 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700 transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Paraphrase All Articles</span>
+                </button>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 text-xs">
+              <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span class="text-slate-500">Paraphrased Articles:</span>
+                <div id="metric-paraphrased-count" class="text-base font-bold text-slate-800">-- / --</div>
+              </div>
+              <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span class="text-slate-500">Average Uniqueness:</span>
+                <div id="metric-uniqueness-score" class="text-base font-bold text-purple-600">--%</div>
+              </div>
+              <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                <span class="text-slate-500">Copyright & Plagiarism Risk:</span>
+                <div id="metric-plagiarism-risk" class="text-base font-bold text-emerald-600">🟢 Low (0% Risk)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Breakdown -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">Editorial Status Breakdown</h3>
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3" id="dash-status-breakdown"></div>
+        </div>
+
+        <!-- Recent Runs Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-200 flex justify-between items-center">
+            <h3 class="text-sm font-bold text-slate-800">Recent Scrape Executions</h3>
+            <button onclick="switchTab('runs')" class="text-xs text-blue-600 hover:underline">View All Runs →</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="px-4 py-3">Source</th>
+                  <th class="px-4 py-3">Trigger</th>
+                  <th class="px-4 py-3">Started</th>
+                  <th class="px-4 py-3">Pages (Att/Succ/Fail)</th>
+                  <th class="px-4 py-3">Articles (Disc/New/Dup)</th>
+                  <th class="px-4 py-3">Saved</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3">Action</th>
+                </tr>
+              </thead>
+              <tbody id="dash-recent-runs-body" class="divide-y divide-slate-100">
+                <tr><td colspan="8" class="text-center py-6 text-slate-400">Loading recent runs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: SCRAPE RUNS -->
+      <div id="tab-runs" class="tab-content space-y-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+          <div>
+            <h2 class="text-base font-bold text-slate-800">Scrape Runs History</h2>
+            <p class="text-xs text-slate-500">Every execution tracks pages attempted, articles discovered, images, and errors.</p>
+          </div>
+          <button onclick="loadRuns()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300">
+            <i class="fa-solid fa-rotate-right mr-1"></i> Refresh Runs
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="px-4 py-3">Source</th>
+                  <th class="px-4 py-3">Trigger</th>
+                  <th class="px-4 py-3">Started</th>
+                  <th class="px-4 py-3">Duration</th>
+                  <th class="px-4 py-3">Pages</th>
+                  <th class="px-4 py-3">Discovered</th>
+                  <th class="px-4 py-3">New</th>
+                  <th class="px-4 py-3">Duplicates</th>
+                  <th class="px-4 py-3">Saved</th>
+                  <th class="px-4 py-3">Images</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3">Details</th>
+                </tr>
+              </thead>
+              <tbody id="runs-table-body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+          <div id="runs-pagination" class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500"></div>
+        </div>
+      </div>
+
+      <!-- TAB 3: ARTICLES -->
+      <div id="tab-articles" class="tab-content space-y-4">
+        <!-- Article Filter Toolbar -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1">Keyword Search</label>
+              <input id="art-search" type="text" placeholder="Search title or content..." onkeydown="if(event.key==='Enter') loadArticles(1)" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1">Source</label>
+              <select id="art-source" onchange="loadArticles(1)" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 focus:ring-2 focus:ring-blue-500">
+                <option value="">All Sources</option>
+                <option value="Times of India">Times of India</option>
+                <option value="The Indian Express">The Indian Express</option>
+                <option value="NDTV">NDTV</option>
+                <option value="News18">News18</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1">Status</label>
+              <select id="art-status" onchange="loadArticles(1)" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 focus:ring-2 focus:ring-blue-500">
+                <option value="">All Statuses</option>
+                <option value="needs_review">Needs Review</option>
+                <option value="draft">Draft</option>
+                <option value="approved">Approved</option>
+                <option value="published">Published</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 block mb-1">Category</label>
+              <select id="art-category" onchange="loadArticles(1)" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 focus:ring-2 focus:ring-blue-500">
+                <option value="">All Categories</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between border-t border-slate-100 pt-3 gap-3">
+            <div class="flex items-center space-x-4 text-xs font-medium text-slate-700">
+              <label class="flex items-center space-x-1.5 cursor-pointer">
+                <input type="checkbox" id="art-missing-img" onchange="loadArticles(1)" class="rounded text-blue-600 focus:ring-blue-500">
+                <span>Missing Image</span>
+              </label>
+              <label class="flex items-center space-x-1.5 cursor-pointer">
+                <input type="checkbox" id="art-missing-desc" onchange="loadArticles(1)" class="rounded text-blue-600 focus:ring-blue-500">
+                <span>Missing Description</span>
+              </label>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button onclick="loadArticles(1)" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm">
+                <i class="fa-solid fa-magnifying-glass mr-1"></i> Apply Filters
+              </button>
+              <button onclick="resetArticleFilters()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg">
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Articles Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="px-4 py-3 w-16">Image</th>
+                  <th class="px-4 py-3">Title & Summary</th>
+                  <th class="px-4 py-3">Source & Category</th>
+                  <th class="px-4 py-3">Published / Collected</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="articles-table-body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+          <div id="articles-pagination" class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500"></div>
+        </div>
+      </div>
+
+      <!-- TAB 4: SOURCES -->
+      <div id="tab-sources" class="tab-content space-y-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+          <div>
+            <h2 class="text-base font-bold text-slate-800">Source Configuration</h2>
+            <p class="text-xs text-slate-500">Manage publisher endpoints, enabled status, polling intervals, and page limits.</p>
+          </div>
+          <button onclick="loadSources()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300">
+            <i class="fa-solid fa-rotate-right mr-1"></i> Refresh Sources
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="sources-grid"></div>
+      </div>
+
+      <!-- TAB 5: ERRORS & LOGS -->
+      <div id="tab-errors" class="tab-content space-y-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+          <div>
+            <h2 class="text-base font-bold text-slate-800">Scraper Errors & Logs</h2>
+            <p class="text-xs text-slate-500">Recorded HTTP errors, timeouts, extraction failures, and invalid structures.</p>
+          </div>
+          <button onclick="loadErrors()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300">
+            <i class="fa-solid fa-rotate-right mr-1"></i> Refresh Logs
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="px-4 py-3">Timestamp</th>
+                  <th class="px-4 py-3">Source</th>
+                  <th class="px-4 py-3">Error Type</th>
+                  <th class="px-4 py-3">URL</th>
+                  <th class="px-4 py-3">Reason / Details</th>
+                </tr>
+              </thead>
+              <tbody id="errors-table-body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 6: AUDIT LOGS -->
+      <div id="tab-audit" class="tab-content space-y-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+          <div>
+            <h2 class="text-base font-bold text-slate-800">Admin Audit Logs</h2>
+            <p class="text-xs text-slate-500">Immutable record of editorial changes, status approvals, source updates, and admin actions.</p>
+          </div>
+          <button onclick="loadAuditLogs()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300">
+            <i class="fa-solid fa-rotate-right mr-1"></i> Refresh Audit
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th class="px-4 py-3">Timestamp</th>
+                  <th class="px-4 py-3">Actor</th>
+                  <th class="px-4 py-3">Action</th>
+                  <th class="px-4 py-3">Entity Type</th>
+                  <th class="px-4 py-3">Entity ID</th>
+                  <th class="px-4 py-3">Details</th>
+                </tr>
+              </thead>
+              <tbody id="audit-table-body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 7: CATEGORIES DISTRIBUTION -->
+      <div id="tab-categories" class="tab-content space-y-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-tags text-blue-600"></i> Categories &amp; Article Distribution
+            </h2>
+            <p class="text-xs text-slate-500">Live article counts, publisher breakdown, and distributed news feeds per category.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="loadCategoriesTab()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300 flex items-center gap-1">
+              <i class="fa-solid fa-rotate-right"></i> Refresh
+            </button>
+            <a href="/api/v1/categories/distribution?limit_per_category=5" target="_blank" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-700 flex items-center gap-1 shadow-sm">
+              <i class="fa-solid fa-code"></i> Distribution API ↗
+            </a>
+          </div>
+        </div>
+
+        <div id="categories-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- MODAL: ARTICLE EDITOR -->
+  <div id="edit-article-modal" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+        <h3 class="text-base font-bold flex items-center"><i class="fa-solid fa-pen-to-square mr-2 text-blue-400"></i> Edit Article</h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-4 flex-1">
+        <input type="hidden" id="edit-art-id">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Title</label>
+          <input type="text" id="edit-title" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Category</label>
+            <input type="text" id="edit-category" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Author / Byline</label>
+            <input type="text" id="edit-author" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Editorial Status</label>
+          <select id="edit-status" class="w-full border border-slate-300 rounded-lg p-2 text-sm bg-slate-50 font-semibold">
+            <option value="needs_review">Needs Review</option>
+            <option value="draft">Draft</option>
+            <option value="approved">Approved</option>
+            <option value="published">Published</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Image URL</label>
+          <input type="text" id="edit-image-url" oninput="updateImagePreview()" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+          <div id="image-preview-container" class="mt-2 hidden">
+            <img id="image-preview" src="" alt="Preview" class="h-32 object-cover rounded-lg border border-slate-200">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Summary / Description</label>
+          <textarea id="edit-description" rows="3" class="w-full border border-slate-300 rounded-lg p-2 text-sm"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Full Article Content</label>
+          <textarea id="edit-content" rows="6" class="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono text-xs"></textarea>
+        </div>
+
+        <!-- Read-Only Original Metadata Box -->
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-1 text-slate-600">
+          <div class="font-bold text-slate-700 mb-1 uppercase tracking-wider">Original Source Metadata</div>
+          <div><strong>Publisher:</strong> <span id="meta-source">--</span></div>
+          <div><strong>Original Link:</strong> <a id="meta-link" href="#" target="_blank" class="text-blue-600 hover:underline break-all">--</a></div>
+          <div><strong>Published At:</strong> <span id="meta-published">--</span></div>
+          <div><strong>Collected At:</strong> <span id="meta-collected">--</span></div>
+          <div><strong>Last Modified:</strong> <span id="meta-updated">--</span></div>
+          <div><strong>Last Edited By:</strong> <span id="meta-editor">--</span></div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 bg-slate-100 border-t border-slate-200 flex justify-end space-x-3">
+        <button onclick="closeEditModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-white border border-slate-300 rounded-lg">Cancel</button>
+        <button id="save-article-btn" onclick="saveArticleEdits()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow"><i class="fa-solid fa-floppy-disk mr-1"></i> Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: RUN DETAILS -->
+  <div id="run-details-modal" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+        <h3 class="text-base font-bold flex items-center"><i class="fa-solid fa-circle-info mr-2 text-indigo-400"></i> Scrape Run Details</h3>
+        <button onclick="closeRunModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-sm text-slate-700" id="run-details-content"></div>
+      <div class="px-6 py-3 bg-slate-100 border-t border-slate-200 flex justify-end">
+        <button onclick="closeRunModal()" class="px-4 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SOURCE EDIT -->
+  <div id="edit-source-modal" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+        <h3 class="text-base font-bold"><i class="fa-solid fa-gear mr-2 text-amber-400"></i> Configure Source</h3>
+        <button onclick="closeSourceModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-sm">
+        <input type="hidden" id="edit-source-id">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Display Name</label>
+          <input type="text" id="edit-source-name" class="w-full border border-slate-300 rounded-lg p-2">
+        </div>
+        <div>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" id="edit-source-enabled" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+            <span class="text-sm font-semibold text-slate-800">Source Enabled for Scraping</span>
+          </label>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Polling Interval (Min)</label>
+            <input type="number" id="edit-source-interval" class="w-full border border-slate-300 rounded-lg p-2">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Timeout (Sec)</label>
+            <input type="number" id="edit-source-timeout" class="w-full border border-slate-300 rounded-lg p-2">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Configured Feeds (JSON format)</label>
+          <textarea id="edit-source-feeds" rows="5" class="w-full border border-slate-300 rounded-lg p-2 font-mono text-xs"></textarea>
+        </div>
+      </div>
+      <div class="px-6 py-3 bg-slate-100 border-t border-slate-200 flex justify-end space-x-3">
+        <button onclick="closeSourceModal()" class="px-4 py-2 text-xs font-semibold bg-white border border-slate-300 rounded-lg">Cancel</button>
+        <button onclick="saveSourceConfig()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow">Save Source</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TRIGGER SCRAPE -->
+  <div id="trigger-scrape-modal" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="text-base font-bold text-slate-800"><i class="fa-solid fa-play text-blue-600 mr-2"></i> Trigger Manual Scrape</h3>
+        <button onclick="closeTriggerModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="text-xs text-slate-600">Select which source to scrape right now in the background, or run across all sources:</p>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Target Source</label>
+        <select id="trigger-source-select" class="w-full border border-slate-300 rounded-lg p-2 text-sm bg-slate-50">
+          <option value="">All Enabled Sources</option>
+          <option value="toi">Times of India</option>
+          <option value="indian_express">The Indian Express</option>
+          <option value="ndtv">NDTV</option>
+          <option value="news18">News18</option>
+        </select>
+      </div>
+      <div class="flex justify-end space-x-2 pt-2">
+        <button onclick="closeTriggerModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-lg">Cancel</button>
+        <button onclick="executeTriggerScrape()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow">Start Scraping</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Admin Controller -->
+  <script>
+    let authToken = localStorage.getItem("news_admin_token") || "";
+    let currentUser = JSON.parse(localStorage.getItem("news_admin_user") || "null");
+    let currentTab = "dashboard";
+    let articlePage = 1;
+
+    function getHeaders() {
+      const h = { "Content-Type": "application/json" };
+      if (authToken) {
+        h["Authorization"] = `Bearer ${authToken}`;
+      }
+      return h;
+    }
+
+    function showToast(msg, type = "success") {
+      const container = document.getElementById("toast-container");
+      const el = document.createElement("div");
+      el.className = `px-4 py-2.5 rounded-lg shadow-lg text-xs font-semibold text-white flex items-center space-x-2 pointer-events-auto transition-all transform duration-300 ${type === 'error' ? 'bg-rose-600' : 'bg-emerald-600'}`;
+      el.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}"></i> <span>${msg}</span>`;
+      container.appendChild(el);
+      setTimeout(() => { el.remove(); }, 3500);
+    }
+
+    // --- AUTH FLOW ---
+    async function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById("login-username").value.trim();
+      const password = document.getElementById("login-password").value;
+      const errBox = document.getElementById("login-error");
+      const errText = document.getElementById("login-error-text");
+
+      errBox.classList.add("hidden");
+
+      try {
+        const res = await fetch("/api/admin/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          authToken = data.token;
+          currentUser = data.user;
+          localStorage.setItem("news_admin_token", authToken);
+          localStorage.setItem("news_admin_user", JSON.stringify(currentUser));
+          showToast(`Welcome back, ${currentUser.display_name || currentUser.username}!`);
+          renderAuthenticatedApp();
+        } else {
+          errText.innerText = data.detail || "Invalid username or password";
+          errBox.classList.remove("hidden");
+        }
+      } catch (err) {
+        errText.innerText = "Connection error: " + err;
+        errBox.classList.remove("hidden");
+      }
+    }
+
+    async function handleLogout() {
+      try {
+        await fetch("/api/admin/auth/logout", {
+          method: "POST",
+          headers: getHeaders()
+        });
+      } catch {}
+      authToken = "";
+      currentUser = null;
+      localStorage.removeItem("news_admin_token");
+      localStorage.removeItem("news_admin_user");
+      showToast("Signed out successfully");
+      renderLoginScreen();
+    }
+
+    function renderLoginScreen() {
+      document.getElementById("login-view").classList.remove("hidden");
+      document.getElementById("app-view").classList.add("hidden");
+    }
+
+    function renderAuthenticatedApp() {
+      document.getElementById("login-view").classList.add("hidden");
+      document.getElementById("app-view").classList.remove("hidden");
+
+      if (currentUser) {
+        document.getElementById("user-display-name").innerText = currentUser.display_name || currentUser.username;
+        const roleBadge = document.getElementById("user-role-badge");
+        roleBadge.innerText = currentUser.role;
+        if (currentUser.role === "admin") {
+          roleBadge.className = "px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 font-mono";
+        } else if (currentUser.role === "editor") {
+          roleBadge.className = "px-1.5 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-300 font-mono";
+        } else {
+          roleBadge.className = "px-1.5 py-0.5 rounded text-[10px] bg-slate-500/20 text-slate-300 font-mono";
+        }
+
+        // Role-based visibility
+        if (currentUser.role === "analyst") {
+          document.getElementById("top-trigger-btn").classList.add("hidden");
+        } else {
+          document.getElementById("top-trigger-btn").classList.remove("hidden");
+        }
+      }
+
+      loadDashboard();
+    }
+
+    async function checkAuthSession() {
+      if (!authToken) {
+        renderLoginScreen();
+        return;
+      }
+      try {
+        const res = await fetch("/api/admin/auth/me", { headers: getHeaders() });
+        const data = await res.json();
+        if (res.ok && data.authenticated) {
+          currentUser = { username: data.username, role: data.role };
+          localStorage.setItem("news_admin_user", JSON.stringify(currentUser));
+          renderAuthenticatedApp();
+        } else {
+          handleLogout();
+        }
+      } catch {
+        renderLoginScreen();
+      }
+    }
+
+    function switchTab(tabId) {
+      currentTab = tabId;
+      document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+      document.getElementById(`tab-${tabId}`).classList.add("active");
+
+      document.querySelectorAll(".nav-btn").forEach(btn => {
+        if (btn.getAttribute("data-tab") === tabId) {
+          btn.classList.add("bg-slate-800", "text-white");
+          btn.classList.remove("text-slate-300");
+        } else {
+          btn.classList.remove("bg-slate-800", "text-white");
+          btn.classList.add("text-slate-300");
+        }
+      });
+
+      if (tabId === "dashboard") loadDashboard();
+      if (tabId === "runs") loadRuns();
+      if (tabId === "articles") loadArticles(1);
+      if (tabId === "categories") loadCategoriesTab();
+      if (tabId === "sources") loadSources();
+      if (tabId === "errors") loadErrors();
+      if (tabId === "audit") loadAuditLogs();
+    }
+
+    // --- DASHBOARD LOADER ---
+    async function loadDashboard() {
+      const range = document.getElementById("dash-range").value;
+      const src = document.getElementById("dash-source").value;
+      try {
+        const res = await fetch(`/api/admin/dashboard?range=${range}&source_id=${src}`, { headers: getHeaders() });
+        if (res.status === 401) { handleLogout(); return; }
+        const data = await res.json();
+
+        document.getElementById("metric-total-runs").innerText = data.total_runs;
+        document.getElementById("metric-pages-attempted").innerText = data.pages_attempted;
+        document.getElementById("metric-page-success-rate").innerText = `Success: ${data.page_success_rate}% (${data.pages_succeeded} / ${data.pages_attempted})`;
+        document.getElementById("metric-articles-discovered").innerText = data.articles_discovered;
+        document.getElementById("metric-new-vs-dup").innerText = `New: ${data.new_articles} · Dup: ${data.duplicate_articles}`;
+        document.getElementById("metric-total-articles").innerText = data.articles_saved;
+
+        // Coverage Bars
+        document.getElementById("metric-image-coverage-pct").innerText = `${data.image_coverage_pct}%`;
+        document.getElementById("metric-image-bar").style.width = `${Math.min(100, data.image_coverage_pct)}%`;
+        document.getElementById("metric-image-counts").innerText = `${data.articles_with_images} with images out of ${data.articles_saved} saved`;
+
+        document.getElementById("metric-desc-coverage-pct").innerText = `${data.description_coverage_pct}%`;
+        document.getElementById("metric-desc-bar").style.width = `${Math.min(100, data.description_coverage_pct)}%`;
+        document.getElementById("metric-desc-counts").innerText = `${data.articles_with_descriptions} with description out of ${data.articles_saved} saved`;
+
+        // Fetch plagiarism & paraphrasing metrics
+        try {
+          const plagRes = await fetch('/api/v1/plagiarism/summary');
+          if (plagRes.ok) {
+            const plagData = await plagRes.json();
+            document.getElementById("metric-paraphrased-count").innerText = `${plagData.paraphrased_articles} / ${plagData.total_articles} (${plagData.paraphrased_percentage}%)`;
+            document.getElementById("metric-uniqueness-score").innerText = `${plagData.average_uniqueness_score}% Unique`;
+            document.getElementById("metric-plagiarism-status").innerText = plagData.plagiarism_status;
+          }
+        } catch {}
+
+        // Editorial Status Breakdown
+        const statusBox = document.getElementById("dash-status-breakdown");
+        const statuses = [
+          { key: "needs_review", label: "Needs Review", color: "amber" },
+          { key: "draft", label: "Draft", color: "slate" },
+          { key: "approved", label: "Approved", color: "blue" },
+          { key: "published", label: "Published", color: "emerald" },
+          { key: "archived", label: "Archived", color: "rose" }
+        ];
+        statusBox.innerHTML = statuses.map(s => `
+          <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+            <div class="text-xs text-slate-500 font-semibold">${s.label}</div>
+            <div class="text-lg font-bold text-slate-800 mt-1">${data.status_breakdown[s.key] || 0}</div>
+          </div>
+        `).join("");
+
+        // Recent Runs
+        const runsBody = document.getElementById("dash-recent-runs-body");
+        if (!data.recent_runs || data.recent_runs.length === 0) {
+          runsBody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400">No scrape runs recorded yet.</td></tr>`;
+        } else {
+          runsBody.innerHTML = data.recent_runs.map(r => `
+            <tr class="hover:bg-slate-50">
+              <td class="px-4 py-2.5 font-semibold text-slate-800">${r.source_id.toUpperCase()}</td>
+              <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-xs bg-slate-100">${r.trigger_type || 'scheduled'}</span></td>
+              <td class="px-4 py-2.5 text-xs text-slate-500">${new Date(r.started_at).toLocaleTimeString()}</td>
+              <td class="px-4 py-2.5 text-xs">${r.pages_attempted} / <span class="text-emerald-600 font-semibold">${r.pages_succeeded}</span> / <span class="text-rose-600 font-semibold">${r.pages_failed}</span></td>
+              <td class="px-4 py-2.5 text-xs">${r.articles_discovered} / ${r.new_articles} / ${r.duplicates}</td>
+              <td class="px-4 py-2.5 font-bold text-slate-700">${r.articles_saved}</td>
+              <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-full text-xs font-semibold ${r.status === 'success' ? 'bg-emerald-100 text-emerald-700' : (r.status === 'running' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700')}">${r.status}</span></td>
+              <td class="px-4 py-2.5"><button onclick="viewRunDetails('${r._id || r.id}')" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">View</button></td>
+            </tr>
+          `).join("");
+        }
+      } catch (err) {
+        showToast("Dashboard error: " + err, "error");
+      }
+    }
+
+    async function triggerBatchParaphrase() {
+      const btn = document.getElementById("btn-batch-paraphrase");
+      const origText = btn.innerHTML;
+      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Paraphrasing...`;
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/v1/articles/paraphrase-batch?limit=500', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`Successfully paraphrased ${data.updated_count} articles! Avg uniqueness: ${data.average_uniqueness_score}%`, "success");
+          loadDashboard();
+        } else {
+          showToast("Failed to run batch paraphrase", "error");
+        }
+      } catch (err) {
+        showToast("Error: " + err, "error");
+      } finally {
+        btn.innerHTML = origText;
+        btn.disabled = false;
+      }
+    }
+
+    // --- SCRAPE RUNS LOADER ---
+    async function loadRuns(page = 1) {
+      const tbody = document.getElementById("runs-table-body");
+      tbody.innerHTML = `<tr><td colspan="12" class="text-center py-6 text-slate-400">Loading runs...</td></tr>`;
+      try {
+        const res = await fetch(`/api/admin/scrape-runs?page=${page}&limit=20`, { headers: getHeaders() });
+        if (res.status === 401) { handleLogout(); return; }
+        const data = await res.json();
+
+        if (data.runs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="12" class="text-center py-6 text-slate-400">No scrape executions found.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = data.runs.map(r => `
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-2.5 font-bold text-slate-800">${r.source_id.toUpperCase()}</td>
+            <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-xs bg-slate-100">${r.trigger_type}</span></td>
+            <td class="px-4 py-2.5 text-xs text-slate-500">${new Date(r.started_at).toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-xs">${r.duration_seconds ? r.duration_seconds + 's' : '--'}</td>
+            <td class="px-4 py-2.5 text-xs">${r.pages_attempted} (${r.pages_succeeded} / ${r.pages_failed})</td>
+            <td class="px-4 py-2.5 text-xs">${r.articles_discovered}</td>
+            <td class="px-4 py-2.5 text-xs font-semibold text-emerald-600">${r.new_articles}</td>
+            <td class="px-4 py-2.5 text-xs text-slate-500">${r.duplicates}</td>
+            <td class="px-4 py-2.5 text-xs font-bold text-slate-800">${r.articles_saved}</td>
+            <td class="px-4 py-2.5 text-xs text-blue-600">${r.image_count}</td>
+            <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-full text-xs font-semibold ${r.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${r.status}</span></td>
+            <td class="px-4 py-2.5"><button onclick="viewRunDetails('${r.id || r._id}')" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Inspect</button></td>
+          </tr>
+        `).join("");
+
+        document.getElementById("runs-pagination").innerHTML = `
+          <span>Showing page ${data.page} of ${Math.ceil(data.total / data.limit) || 1} (${data.total} total runs)</span>
+          <div class="space-x-1">
+            <button onclick="loadRuns(${data.page - 1})" ${data.page <= 1 ? 'disabled class="opacity-50"' : ''} class="px-2 py-1 bg-white border border-slate-300 rounded">Prev</button>
+            <button onclick="loadRuns(${data.page + 1})" ${data.page * data.limit >= data.total ? 'disabled class="opacity-50"' : ''} class="px-2 py-1 bg-white border border-slate-300 rounded">Next</button>
+          </div>
+        `;
+      } catch (err) {
+        showToast("Runs error: " + err, "error");
+      }
+    }
+
+    async function viewRunDetails(runId) {
+      try {
+        const res = await fetch(`/api/admin/scrape-runs/${runId}`, { headers: getHeaders() });
+        const run = await res.json();
+        const content = document.getElementById("run-details-content");
+
+        content.innerHTML = `
+          <div class="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div><strong>Run ID:</strong> <span class="font-mono text-xs">${run.id || run._id}</span></div>
+            <div><strong>Status:</strong> <span class="font-bold text-blue-600 uppercase">${run.status}</span></div>
+            <div><strong>Source:</strong> ${run.source_id.toUpperCase()}</div>
+            <div><strong>Trigger Type:</strong> ${run.trigger_type}</div>
+            <div><strong>Started:</strong> ${new Date(run.started_at).toLocaleString()}</div>
+            <div><strong>Duration:</strong> ${run.duration_seconds || 0} seconds</div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+              <div class="text-xs text-indigo-700 font-semibold">Pages</div>
+              <div class="text-lg font-bold text-indigo-900 mt-1">${run.pages_succeeded} / ${run.pages_attempted}</div>
+              <div class="text-xs text-rose-500">${run.pages_failed} failed</div>
+            </div>
+            <div class="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+              <div class="text-xs text-emerald-700 font-semibold">Articles</div>
+              <div class="text-lg font-bold text-emerald-900 mt-1">${run.articles_saved} saved</div>
+              <div class="text-xs text-slate-500">${run.new_articles} new · ${run.duplicates} dup</div>
+            </div>
+            <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+              <div class="text-xs text-blue-700 font-semibold">Coverage</div>
+              <div class="text-lg font-bold text-blue-900 mt-1">${run.image_count} imgs</div>
+              <div class="text-xs text-slate-500">${run.description_count} desc</div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="font-bold text-xs uppercase tracking-wider text-slate-700 mb-2">Errors in this run (${(run.errors || []).length})</h4>
+            ${(run.errors && run.errors.length > 0) ? `
+              <div class="bg-rose-50 p-3 rounded-lg border border-rose-200 text-xs text-rose-800 space-y-1 max-h-40 overflow-y-auto font-mono">
+                ${run.errors.map(e => `<div>• ${e}</div>`).join("")}
+              </div>
+            ` : '<div class="text-xs text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check"></i> Zero errors recorded during this run.</div>'}
+          </div>
+        `;
+        document.getElementById("run-details-modal").classList.remove("hidden");
+      } catch (err) {
+        showToast("Error inspecting run: " + err, "error");
+      }
+    }
+
+    function closeRunModal() {
+      document.getElementById("run-details-modal").classList.add("hidden");
+    }
+
+    // --- ARTICLES LOADER ---
+    async function loadArticles(page = 1) {
+      articlePage = page;
+      const search = document.getElementById("art-search").value;
+      const source = document.getElementById("art-source").value;
+      const status = document.getElementById("art-status").value;
+      const category = document.getElementById("art-category").value;
+      const missingImg = document.getElementById("art-missing-img").checked;
+      const missingDesc = document.getElementById("art-missing-desc").checked;
+
+      const tbody = document.getElementById("articles-table-body");
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400">Loading articles...</td></tr>`;
+
+      let url = `/api/admin/articles?page=${page}&limit=15&search=${encodeURIComponent(search)}&source=${encodeURIComponent(source)}&status=${encodeURIComponent(status)}&category=${encodeURIComponent(category)}`;
+      if (missingImg) url += `&missing_image=true`;
+      if (missingDesc) url += `&missing_description=true`;
+
+      try {
+        const res = await fetch(url, { headers: getHeaders() });
+        if (res.status === 401) { handleLogout(); return; }
+        const data = await res.json();
+
+        // Populate Category Filter dropdown once if empty
+        const catSelect = document.getElementById("art-category");
+        if (catSelect.options.length <= 1) {
+          fetch('/api/categories').then(r => r.json()).then(cats => {
+            (cats.categories || []).forEach(c => {
+              const opt = document.createElement("option");
+              opt.value = c;
+              opt.innerText = c.charAt(0).toUpperCase() + c.slice(1);
+              catSelect.appendChild(opt);
+            });
+          });
+        }
+
+        if (!data.articles || data.articles.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400">No matching articles found.</td></tr>`;
+          return;
+        }
+
+        const isAnalyst = currentUser && currentUser.role === "analyst";
+
+        tbody.innerHTML = data.articles.map(a => `
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-3">
+              ${a.image_url ? `
+                <img src="${a.image_url}" class="w-14 h-12 object-cover rounded border border-slate-200" onerror="this.onerror=null;this.src='https://placehold.co/100x80?text=No+Img'">
+              ` : `
+                <div class="w-14 h-12 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-xs"><i class="fa-solid fa-image"></i></div>
+              `}
+            </td>
+            <td class="px-4 py-3 max-w-md">
+              <a href="${a.source_url}" target="_blank" class="font-bold text-slate-900 hover:text-blue-600 line-clamp-1">${a.title}</a>
+              <p class="text-xs text-slate-500 line-clamp-2 mt-0.5">${a.description || a.summary || 'No description provided.'}</p>
+            </td>
+            <td class="px-4 py-3 text-xs">
+              <div class="font-semibold text-slate-800">${a.source_name || a.source}</div>
+              <span class="inline-block px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 mt-0.5">${a.category}</span>
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-500">
+              <div>Pub: ${a.published_at ? new Date(a.published_at).toLocaleDateString() : 'N/A'}</div>
+              <div class="text-[10px] text-slate-400">Scraped: ${new Date(a.collected_at || a.fetched_at).toLocaleTimeString()}</div>
+            </td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-1 rounded-full text-xs font-semibold status-badge-${a.status}">${a.status}</span>
+            </td>
+            <td class="px-4 py-3 text-right space-x-1">
+              <button onclick="openEditModal('${a.id || a.article_id}')" class="px-2 py-1 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded">
+                <i class="fa-solid fa-pen-to-square"></i> ${isAnalyst ? 'View' : 'Edit'}
+              </button>
+              ${!isAnalyst && a.status !== 'approved' && a.status !== 'published' ? `
+                <button onclick="quickStatus('${a.id || a.article_id}', 'approved')" title="Quick Approve" class="px-2 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded">
+                  <i class="fa-solid fa-check"></i>
+                </button>
+              ` : ''}
+              ${!isAnalyst && a.status !== 'archived' ? `
+                <button onclick="quickStatus('${a.id || a.article_id}', 'archived')" title="Archive" class="px-2 py-1 text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 rounded">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              ` : ''}
+            </td>
+          </tr>
+        `).join("");
+
+        document.getElementById("articles-pagination").innerHTML = `
+          <span>Showing page ${data.page} of ${Math.ceil(data.total / data.limit) || 1} (${data.total} total articles)</span>
+          <div class="space-x-1">
+            <button onclick="loadArticles(${data.page - 1})" ${data.page <= 1 ? 'disabled class="opacity-50"' : ''} class="px-2 py-1 bg-white border border-slate-300 rounded">Prev</button>
+            <button onclick="loadArticles(${data.page + 1})" ${data.page * data.limit >= data.total ? 'disabled class="opacity-50"' : ''} class="px-2 py-1 bg-white border border-slate-300 rounded">Next</button>
+          </div>
+        `;
+      } catch (err) {
+        showToast("Articles error: " + err, "error");
+      }
+    }
+
+    function resetArticleFilters() {
+      document.getElementById("art-search").value = "";
+      document.getElementById("art-source").value = "";
+      document.getElementById("art-status").value = "";
+      document.getElementById("art-category").value = "";
+      document.getElementById("art-missing-img").checked = false;
+      document.getElementById("art-missing-desc").checked = false;
+      loadArticles(1);
+    }
+
+    async function quickStatus(artId, status) {
+      try {
+        const res = await fetch(`/api/admin/articles/${artId}/status`, {
+          method: "POST",
+          headers: getHeaders(),
+          body: JSON.stringify({ status })
+        });
+        if (res.ok) {
+          showToast(`Article status updated to ${status}`);
+          loadArticles(articlePage);
+        } else {
+          showToast("Failed to update status", "error");
+        }
+      } catch (err) {
+        showToast("Error updating status: " + err, "error");
+      }
+    }
+
+    // --- ARTICLE EDITOR ---
+    async function openEditModal(artId) {
+      try {
+        const res = await fetch(`/api/admin/articles/${artId}`, { headers: getHeaders() });
+        const a = await res.json();
+
+        document.getElementById("edit-art-id").value = a.id;
+        document.getElementById("edit-title").value = a.title || "";
+        document.getElementById("edit-category").value = a.category || "general";
+        document.getElementById("edit-author").value = a.author || "";
+        document.getElementById("edit-status").value = a.status || "needs_review";
+        document.getElementById("edit-image-url").value = a.image_url || a.top_image || "";
+        document.getElementById("edit-description").value = a.description || a.summary || "";
+        document.getElementById("edit-content").value = a.content || "";
+
+        // Metadata box
+        document.getElementById("meta-source").innerText = a.source_name || a.source || "Unknown";
+        const linkEl = document.getElementById("meta-link");
+        linkEl.href = a.source_url;
+        linkEl.innerText = a.source_url;
+        document.getElementById("meta-published").innerText = a.published_at ? new Date(a.published_at).toLocaleString() : 'N/A';
+        document.getElementById("meta-collected").innerText = new Date(a.collected_at || a.fetched_at).toLocaleString();
+        document.getElementById("meta-updated").innerText = a.updated_at ? new Date(a.updated_at).toLocaleString() : 'Never';
+        document.getElementById("meta-editor").innerText = a.last_edited_by || 'Scraper Automated';
+
+        const isAnalyst = currentUser && currentUser.role === "analyst";
+        document.getElementById("save-article-btn").style.display = isAnalyst ? "none" : "inline-block";
+
+        updateImagePreview();
+        document.getElementById("edit-article-modal").classList.remove("hidden");
+      } catch (err) {
+        showToast("Error loading article: " + err, "error");
+      }
+    }
+
+    function closeEditModal() {
+      document.getElementById("edit-article-modal").classList.add("hidden");
+    }
+
+    function updateImagePreview() {
+      const url = document.getElementById("edit-image-url").value;
+      const container = document.getElementById("image-preview-container");
+      const img = document.getElementById("image-preview");
+      if (url && url.startsWith("http")) {
+        img.src = url;
+        container.classList.remove("hidden");
+      } else {
+        container.classList.add("hidden");
+      }
+    }
+
+    async function saveArticleEdits() {
+      const artId = document.getElementById("edit-art-id").value;
+      const body = {
+        title: document.getElementById("edit-title").value,
+        category: document.getElementById("edit-category").value,
+        author: document.getElementById("edit-author").value,
+        status: document.getElementById("edit-status").value,
+        image_url: document.getElementById("edit-image-url").value,
+        description: document.getElementById("edit-description").value,
+        content: document.getElementById("edit-content").value
+      };
+
+      try {
+        const res = await fetch(`/api/admin/articles/${artId}`, {
+          method: "PATCH",
+          headers: getHeaders(),
+          body: JSON.stringify(body)
+        });
+
+        if (res.ok) {
+          showToast("Article successfully updated and audit logged!");
+          closeEditModal();
+          loadArticles(articlePage);
+        } else {
+          showToast("Error saving article edits", "error");
+        }
+      } catch (err) {
+        showToast("Error: " + err, "error");
+      }
+    }
+
+    // --- SOURCES LOADER ---
+    async function loadSources() {
+      const grid = document.getElementById("sources-grid");
+      grid.innerHTML = `<div class="col-span-2 text-center py-6 text-slate-400">Loading sources...</div>`;
+
+      try {
+        const res = await fetch(`/api/admin/sources`, { headers: getHeaders() });
+        if (res.status === 401) { handleLogout(); return; }
+        const data = await res.json();
+
+        const isAnalyst = currentUser && currentUser.role === "analyst";
+
+        grid.innerHTML = data.map(s => `
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex justify-between items-start">
+              <div>
+                <h3 class="text-base font-bold text-slate-900">${s.display_name}</h3>
+                <span class="text-xs font-mono text-slate-400">${s.source_id}</span>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" onchange="toggleSourceEnabled('${s.source_id}', this.checked)" ${s.enabled ? 'checked' : ''} ${isAnalyst ? 'disabled' : ''} class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
+              <div><strong>Polling Interval:</strong> ${s.polling_interval_minutes}m</div>
+              <div><strong>Page Limit:</strong> ${s.page_limit === 0 ? 'No limit' : s.page_limit}</div>
+              <div><strong>Timeout:</strong> ${s.request_timeout_seconds}s</div>
+              <div><strong>Feeds:</strong> ${(s.feeds || []).length} configured</div>
+              <div class="col-span-2"><strong>Last Run:</strong> ${s.last_run_at ? new Date(s.last_run_at).toLocaleString() : 'None yet'}</div>
+            </div>
+
+            <div class="flex justify-between items-center pt-2">
+              ${!isAnalyst ? `
+                <button onclick="triggerSourceScrape('${s.source_id}')" class="text-xs font-semibold text-blue-600 hover:text-blue-800">
+                  <i class="fa-solid fa-play mr-1"></i> Scrape Now
+                </button>
+                <button onclick="openSourceModal('${s.source_id}')" class="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700">
+                  <i class="fa-solid fa-gear mr-1"></i> Edit Feeds & Settings
+                </button>
+              ` : '<span class="text-xs text-slate-400">Read only access</span>'}
+            </div>
+          </div>
+        `).join("");
+      } catch (err) {
+        showToast("Error loading sources: " + err, "error");
+      }
+    }
+
+    async function toggleSourceEnabled(sourceId, enabled) {
+      try {
+        const res = await fetch(`/api/admin/sources/${sourceId}`, {
+          method: "PATCH",
+          headers: getHeaders(),
+          body: JSON.stringify({ enabled })
+        });
+        if (res.ok) {
+          showToast(`Source ${sourceId} ${enabled ? 'enabled' : 'disabled'}`);
+        } else {
+          showToast("Failed to update source state", "error");
+        }
+      } catch (err) {
+        showToast("Error: " + err, "error");
+      }
+    }
+
+    async function triggerSourceScrape(sourceId) {
+      try {
+        const res = await fetch(`/api/admin/scrape-runs/trigger?source_id=${sourceId}`, {
+          method: "POST",
+          headers: getHeaders()
+        });
+        const data = await res.json();
+        showToast(`Scrape triggered for ${sourceId}!`);
+        setTimeout(loadDashboard, 1500);
+      } catch (err) {
+        showToast("Error: " + err, "error");
+      }
+    }
+
+    async function openSourceModal(sourceId) {
+      try {
+        const res = await fetch(`/api/admin/sources`, { headers: getHeaders() });
+        const list = await res.json();
+        const s = list.find(x => x.source_id === sourceId);
+        if (!s) return;
+
+        document.getElementById("edit-source-id").value = s.source_id;
+        document.getElementById("edit-source-name").value = s.display_name;
+        document.getElementById("edit-source-enabled").checked = s.enabled;
+        document.getElementById("edit-source-interval").value = s.polling_interval_minutes;
+        document.getElementById("edit-source-timeout").value = s.request_timeout_seconds;
+        document.getElementById("edit-source-feeds").value = JSON.stringify(s.feeds || [], null, 2);
+
+        document.getElementById("edit-source-modal").classList.remove("hidden");
+      } catch (err) {
+        showToast("Error opening source: " + err, "error");
+      }
+    }
+
+    function closeSourceModal() {
+      document.getElementById("edit-source-modal").classList.add("hidden");
+    }
+
+    async function saveSourceConfig() {
+      const sourceId = document.getElementById("edit-source-id").value;
+      let feeds;
+      try {
+        feeds = JSON.parse(document.getElementById("edit-source-feeds").value);
+      } catch (e) {
+        showToast("Feeds must be valid JSON array", "error");
+        return;
+      }
+
+      const body = {
+        display_name: document.getElementById("edit-source-name").value,
+        enabled: document.getElementById("edit-source-enabled").checked,
+        polling_interval_minutes: parseInt(document.getElementById("edit-source-interval").value),
+        request_timeout_seconds: parseInt(document.getElementById("edit-source-timeout").value),
+        feeds: feeds
+      };
+
+      try {
+        const res = await fetch(`/api/admin/sources/${sourceId}`, {
+          method: "PATCH",
+          headers: getHeaders(),
+          body: JSON.stringify(body)
+        });
+        if (res.ok) {
+          showToast("Source settings updated!");
+          closeSourceModal();
+          loadSources();
+        } else {
+          showToast("Failed saving source", "error");
+        }
+      } catch (err) {
+        showToast("Error: " + err, "error");
+      }
+    }
+
+    // --- ERRORS & LOGS ---
+    async function loadErrors() {
+      const tbody = document.getElementById("errors-table-body");
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">Loading errors...</td></tr>`;
+
+      try {
+        const res = await fetch(`/api/admin/errors?limit=50`, { headers: getHeaders() });
+        if (res.status === 401) { handleLogout(); return; }
+        const list = await res.json();
+
+        if (list.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i> No scraper errors logged.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = list.map(e => `
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-2.5 text-xs text-slate-500">${new Date(e.timestamp).toLocaleString()}</td>
+            <td class="px-4 py-2.5 font-bold text-slate-800 text-xs">${e.source_name || e.source_id}</td>
+            <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-700">${e.error_type}</span></td>
+            <td class="px-4 py-2.5 text-xs font-mono text-slate-600 break-all">${e.url || '--'}</td>
+            <td class="px-4 py-2.5 text-xs text-rose-600">${e.reason}</td>
+          </tr>
+        `).join("");
+      } catch (err) {
+        showToast("Error loading logs: " + err, "error");
+      }
+    }
+
+    // --- AUDIT LOGS ---
+    async function loadAuditLogs() {
+      const tbody = document.getElementById("audit-table-body");
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400">Loading audit log...</td></tr>`;
+
+      try {
+        const res = await fetch(`/api/admin/audit-logs?limit=50`, { headers: getHeaders() });
+        if (res.status === 401) { handleLogout(); return; }
+        const list = await res.json();
+
+        if (list.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400">No audit events recorded yet.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = list.map(a => `
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-2.5 text-xs text-slate-500">${new Date(a.timestamp).toLocaleString()}</td>
+            <td class="px-4 py-2.5 font-bold text-slate-800 text-xs">${a.actor_id}</td>
+            <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">${a.action}</span></td>
+            <td class="px-4 py-2.5 text-xs uppercase font-semibold text-slate-500">${a.entity_type}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-slate-600">${a.entity_id}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-slate-500">${JSON.stringify(a.details || {})}</td>
+          </tr>
+        `).join("");
+      } catch (err) {
+        showToast("Error loading audit: " + err, "error");
+      }
+    }
+
+    // --- CATEGORIES DISTRIBUTION ---
+    async function loadCategoriesTab() {
+      const container = document.getElementById("categories-grid");
+      if (!container) return;
+      container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><div>Loading categories distribution...</div></div>`;
+      try {
+        const res = await fetch("/api/v1/categories");
+        const data = await res.json();
+        if (!data.success || !data.distribution || data.distribution.length === 0) {
+          container.innerHTML = `<div class="col-span-full py-8 text-center text-slate-400">No categories found.</div>`;
+          return;
+        }
+
+        container.innerHTML = data.distribution.map(cat => {
+          const publishersBadges = (cat.publishers || []).map(p => 
+            `<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">${p}</span>`
+          ).join(" ");
+
+          return `
+            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow transition flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <span class="px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+                    ${cat.name}
+                  </span>
+                  <span class="text-xs font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded">
+                    ${cat.total_articles.toLocaleString()} stories
+                  </span>
+                </div>
+                <div class="text-xs text-slate-500 mb-2">Slug: <code class="bg-slate-100 px-1 py-0.5 rounded text-blue-600">/category/${cat.slug}</code></div>
+                <div class="text-xs font-medium text-slate-600 mb-1">Active Publishers:</div>
+                <div class="flex flex-wrap gap-1 mb-4">
+                  ${publishersBadges || '<span class="text-xs text-slate-400">None</span>'}
+                </div>
+              </div>
+
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                <a href="/api/v1/categories/${cat.slug}" target="_blank" class="text-xs text-blue-600 hover:underline font-semibold flex items-center gap-1">
+                  JSON API <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                </a>
+                <button onclick="viewCategoryArticles('${cat.slug}')" class="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded text-xs font-medium shadow-sm flex items-center gap-1">
+                  <i class="fa-solid fa-eye"></i> View Stories
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("");
+      } catch (err) {
+        container.innerHTML = `<div class="col-span-full py-8 text-center text-rose-500 font-semibold">Failed to load categories: ${err.message}</div>`;
+      }
+    }
+
+    function viewCategoryArticles(slug) {
+      switchTab("articles");
+      const catSelect = document.getElementById("art-filter-category");
+      if (catSelect) {
+        catSelect.value = slug;
+      }
+      loadArticles(1);
+    }
+
+    // --- TRIGGER MODAL ---
+    function triggerScrapeModal() {
+      document.getElementById("trigger-scrape-modal").classList.remove("hidden");
+    }
+    function closeTriggerModal() {
+      document.getElementById("trigger-scrape-modal").classList.add("hidden");
+    }
+    async function executeTriggerScrape() {
+      const src = document.getElementById("trigger-source-select").value;
+      closeTriggerModal();
+      showToast("Triggering background scraper run...");
+      try {
+        const res = await fetch(`/api/admin/scrape-runs/trigger?source_id=${src}`, {
+          method: "POST",
+          headers: getHeaders()
+        });
+        const data = await res.json();
+        showToast("Scraper launched successfully!");
+        setTimeout(loadDashboard, 1500);
+      } catch (err) {
+        showToast("Error triggering scrape: " + err, "error");
+      }
+    }
+
+    // Initialize Auth state on load
+    document.addEventListener("DOMContentLoaded", () => {
+      checkAuthSession();
+    });
+  </script>
+</body>
+</html>

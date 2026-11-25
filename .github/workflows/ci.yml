@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: news
+          POSTGRES_PASSWORD: news
+          POSTGRES_DB: news_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U news -d news_test" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://news:news@localhost:5432/news_test
+      DATABASE_URL: postgresql://news:news@localhost:5432/news_test
+      PAYLOAD_SECRET: ci-only-secret-ci-only-secret-0123456789
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm -r typecheck
+      - name: Unit tests
+        run: pnpm -r test
+      # Runs against the committed migrations (schema push disabled), so a schema
+      # change without a matching migration fails here.
+      - name: Integration tests (Postgres)
+        run: pnpm --filter cms test:int
+      - name: Build CMS
+        run: pnpm --filter cms build
+      - name: Build website
+        run: pnpm --filter web build
+        env:
+          CMS_URL: http://localhost:3001
+          NEXT_PUBLIC_SITE_URL: https://www.example.com
+      - name: Dependency audit (high+)
+        run: pnpm audit --prod --audit-level high
+        continue-on-error: true

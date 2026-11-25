@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.env
+.env.local
+.env*.local
+*.tsbuildinfo
+apps/cms/media/
+.vercel
+coverage/
+.venv/
+apps/scraper/.venv/
+__pycache__/
+*.pyc
+temp_news/
+*.log
+*.err
+
