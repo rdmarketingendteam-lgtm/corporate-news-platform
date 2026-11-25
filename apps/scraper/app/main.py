@@ -1184,8 +1184,7 @@ def request_gmail_otp(req: OtpRequest, request: Request):
         "success": True,
         "message": f"6-digit security OTP sent to your private inbox ({email}). Please check your Gmail (and Spam/Updates folder).",
         "email": email,
-        "expires_in_seconds": 300,
-        "dev_otp": otp_code
+        "expires_in_seconds": 300
     }
 
 @app.post("/api/v1/auth/gmail/verify-otp")
@@ -1209,7 +1208,7 @@ def verify_gmail_otp(req: OtpVerifyRequest, request: Request):
     if record.get("attempts", 0) >= 5:
         raise HTTPException(status_code=403, detail="Too many incorrect OTP attempts. Code invalidated for security. Please request a new one.")
     
-    if record["otp"] != otp_input and otp_input != "123456":
+    if record["otp"] != otp_input:
         auth_otps.update_one({"_id": record["_id"]}, {"$inc": {"attempts": 1}})
         remaining = 5 - (record.get("attempts", 0) + 1)
         raise HTTPException(status_code=400, detail=f"Invalid OTP code. {remaining} attempt(s) remaining.")

@@ -9,7 +9,6 @@ export function GmailOtpAuth({ nextUrl = '/account' }: { nextUrl?: string }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [msg, setMsg] = useState('')
   const [timeLeft, setTimeLeft] = useState(300)
-  const [devOtp, setDevOtp] = useState<string | null>(null)
 
   useEffect(() => {
     let timer: any
@@ -49,7 +48,6 @@ export function GmailOtpAuth({ nextUrl = '/account' }: { nextUrl?: string }) {
         setStep('otp')
         setStatus('idle')
         setTimeLeft(data.expires_in_seconds || 300)
-        if (data.dev_otp) setDevOtp(data.dev_otp)
       } else {
         setStatus('error')
         setMsg(data.error || 'Failed to send OTP. Please check your address.')
@@ -279,46 +277,8 @@ export function GmailOtpAuth({ nextUrl = '/account' }: { nextUrl?: string }) {
               marginBottom: '14px'
             }}>
               <i className="fa-solid fa-envelope-circle-check" style={{ marginRight: '6px', fontSize: '14px', color: '#16a34a' }}></i>
-              A 6-digit security OTP has been sent directly to <strong>{email}</strong>.
+              A 6-digit security OTP has been sent directly to <strong>{email}</strong>. Please check your inbox or spam folder.
             </div>
-
-            {devOtp && (
-              <div
-                style={{
-                  background: '#f0fdf4',
-                  border: '1px dashed #22c55e',
-                  borderRadius: '4px',
-                  padding: '8px 12px',
-                  fontSize: '11px',
-                  color: '#15803d',
-                  textAlign: 'center',
-                  marginBottom: '14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                }}
-              >
-                <i className="fa-solid fa-key" style={{ color: '#16a34a' }}></i>
-                <span>Generated Code: <strong>{devOtp}</strong> (or test code <strong>123456</strong>)</span>
-                <button
-                  type="button"
-                  onClick={() => setOtp(devOtp)}
-                  style={{
-                    background: '#16a34a',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '2px',
-                    padding: '2px 8px',
-                    fontSize: '10px',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                  }}
-                >
-                  Auto-Fill
-                </button>
-              </div>
-            )}
 
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#374151', marginBottom: '6px', textAlign: 'center' }}>
